@@ -1,36 +1,45 @@
 import streamlit as st
 import requests
 
-st.title("🔐 Login")
+st.set_page_config(page_title="Login")
 
-email = st.text_input("Email")
-password = st.text_input("Password", type="password")
+st.title("🔐 Đăng nhập hệ thống")
 
-if st.button("Login"):
+col1,col2,col3 = st.columns([1,2,1])
 
-    response = requests.post(
-        "http://127.0.0.1:8000/auth/login",
-        json={
-            "email": email,
-            "password": password
-        }
+with col2:
+
+    email = st.text_input("📧 Email")
+
+    password = st.text_input(
+        "🔑 Password",
+        type="password"
     )
 
-    data = response.json()
+    if st.button("Đăng nhập"):
 
-    if "token" in data:
+        response = requests.post(
+            "http://127.0.0.1:8000/auth/login",
+            json={
+                "email": email,
+                "password": password
+            }
+        )
 
-        st.session_state["token"] = data["token"]
-        st.session_state["role"] = data["role"]
-        st.session_state["name"] = data["name"]
+        data = response.json()
 
-        st.success("Login successful!")
+        if "token" in data:
 
-        # Redirect
-        if data["role"] == "admin":
-            st.switch_page("pages/6_Admin_Dashboard.py")
+            st.session_state["token"] = data["token"]
+            st.session_state["role"] = data["role"]
+            st.session_state["name"] = data["name"]
+
+            st.success("Đăng nhập thành công")
+
+            if data["role"] == "admin":
+                st.switch_page("pages/6_Admin_Dashboard.py")
+            else:
+                st.switch_page("pages/4_Search_Rentals.py")
+
         else:
-            st.switch_page("pages/4_Search_Rentals.py")
-
-    else:
-        st.error(data["error"])
+            st.error(data["error"])
