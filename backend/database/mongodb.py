@@ -8,7 +8,7 @@ MONGO_URI = os.getenv(
 
 client = AsyncIOMotorClient(MONGO_URI)
 
-db = client["dss_rental_db"]
+db = client["dss_rental"]
 
 users_collection = db["users"]
 rentals_collection = db["rentals"]
