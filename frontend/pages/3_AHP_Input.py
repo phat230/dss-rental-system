@@ -3,6 +3,8 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 
+
+
 # --- 1. THIẾT LẬP CẤU HÌNH ---
 st.set_page_config(page_title="Hệ Thống Phân Tích AHP", layout="wide", initial_sidebar_state="collapsed")
 
@@ -155,88 +157,169 @@ with st.container(border=True):
         """, unsafe_allow_html=True)
 
 # ==========================================
-# BƯỚC 5: ĐÁNH GIÁ PHƯƠNG ÁN (GRID LAYOUT: 2 CỘT)
+# BƯỚC 5: ĐÁNH GIÁ PHƯƠNG ÁN (AUTO-FILLED MATRIX)
 # ==========================================
+
+# 1. NHẬN DỮ LIỆU TỪ TRANG 4
+if "selected_houses_data" in st.session_state and len(st.session_state["selected_houses_data"]) >= 2:
+    selected_data = st.session_state["selected_houses_data"]
+    alternatives = [item['Ten'] for item in selected_data]
+    
+    lookup_data = {}
+    for item in selected_data:
+        lookup_data[item['Ten']] = {
+            "Giá thuê": item.get('Giá thuê', '0 VNĐ'),
+            "Vị trí": item.get('Vị trí', 'N/A'),
+            "Diện tích": item.get('Diện tích', '0 m²'),
+            "An ninh": item.get('An ninh', 'Khá'),
+            "Tiện ích": item.get('Tiện ích', 'Cơ bản'),
+            "Tự do": item.get('Tự do', 'Trung bình')
+        }
+else:
+    st.warning("⚠️ BẠN CHƯA CHỌN ĐỦ PHƯƠNG ÁN")
+    st.stop()
+
+# 2. HÀM TỰ ĐỘNG TÍNH TOÁN MA TRẬN DỰA TRÊN GIÁ TRỊ THẬT
+def get_auto_filled_matrix(criterion_name):
+    n = len(selected_data)
+    matrix = np.ones((n, n))
+    
+    # Bảng điểm cho tiêu chí định tính
+    rank_map = {
+        "Tuyệt đối": 5, "Rất tốt": 4.5, "Tốt": 4, "Khá": 3, "Trung bình": 2, "Thấp": 1,
+        "Cao": 4, "Đầy đủ": 4, "Hiện đại": 4.5, "Cơ bản": 2, "Ít": 1.5, "Tự do": 5, "Chung chủ": 1.5
+    }
+
+    for i in range(n):
+        for j in range(n):
+            if i == j: continue
+            val_i = selected_data[i].get(criterion_name, "")
+            val_j = selected_data[j].get(criterion_name, "")
+
+            try:
+                if criterion_name == "Giá thuê":
+                    # Giá càng thấp càng tốt -> PA_i tốt hơn PA_j nếu Giá_j > Giá_i
+                    num_i = float(str(val_i).replace(',', '').replace(' VNĐ', ''))
+                    num_j = float(str(val_j).replace(',', '').replace(' VNĐ', ''))
+                    matrix[i, j] = num_j / num_i 
+                elif criterion_name == "Diện tích":
+                    num_i = float(str(val_i).replace(' m²', ''))
+                    num_j = float(str(val_j).replace(' m²', ''))
+                    matrix[i, j] = num_i / num_j
+                else:
+                    matrix[i, j] = rank_map.get(val_i, 3) / rank_map.get(val_j, 3)
+            except:
+                matrix[i, j] = 1.0
+    return matrix
+
 with st.container(border=True):
     st.markdown("#### ĐÁNH GIÁ PHƯƠNG ÁN TRÊN TỪNG TIÊU CHÍ")
     
-    legend_items = "".join([f"<div><span style='font-weight:700; color:#1e293b;'>PA{i+1}:</span> {alt}</div>" for i, alt in enumerate(alternatives)])
-    
-    st.markdown(f"""
-    <div style='background-color: #f1f5f9; padding: 1rem; border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 1.5rem;'>
-        <div style='font-weight: 700; color: #0f172a; font-size: 0.85rem; margin-bottom: 8px;'>CHÚ GIẢI KÝ HIỆU PHƯƠNG ÁN (PA):</div>
-        <div style='display: flex; flex-wrap: wrap; gap: 20px; font-size: 0.85rem; color: #334155;'>
-            {legend_items}
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    # Bảng thông số đối chiếu
+    st.dataframe(pd.DataFrame.from_dict(lookup_data, orient='index'), use_container_width=True)
     
     alt_scores_matrix = np.zeros((len(alternatives), len(criteria)))
+    short_alts = [f"PA{i+1}" for i in range(len(alternatives))]
     
+    # Hiển thị Ma trận theo dạng Grid hệt như hình bạn yêu cầu
     for row_idx in range(3):
         cols = st.columns(2, gap="large")
         for col_idx in range(2):
             j = row_idx * 2 + col_idx
-            with cols[col_idx]:
-                st.markdown(f"<div style='font-weight: 800; color: #ffffff; background-color: #1e293b; padding: 8px; text-align: center; border-radius: 4px; margin-bottom: 10px;'>{criteria[j].upper()}</div>", unsafe_allow_html=True)
-                alt_matrix = render_matrix_ui(alternatives, f"alt_crit_{j}", short_alts)
-                alt_weights, alt_cr, _, _ = calculate_ahp(alt_matrix)
-                alt_scores_matrix[:, j] = alt_weights
-                
-                cr_color = "#16a34a" if alt_cr <= 0.1 else "#dc2626"
-                cr_status = "Đạt chuẩn" if alt_cr <= 0.1 else "Lỗi Logic"
-                st.markdown(f"<div style='text-align: center; font-weight: 600; font-size: 0.85rem; margin-top:10px; margin-bottom: 15px;'>Tỷ số CR: <span style='color:{cr_color}'>{alt_cr:.4f} ({cr_status})</span></div>", unsafe_allow_html=True)
+            if j < len(criteria):
+                with cols[col_idx]:
+                    st.markdown(f"<div style='font-weight: 800; color: #ffffff; background-color: #0f172a; padding: 10px; text-align: center; border-radius: 4px; margin-bottom: 5px;'>TIÊU CHÍ: {criteria[j].upper()}</div>", unsafe_allow_html=True)
+                    
+                    # 1. LẤY MA TRẬN ĐÃ ĐƯỢC MÁY TÍNH TỰ ĐỘNG
+                    auto_matrix = get_auto_filled_matrix(criteria[j])
+                    
+                    # 2. VẼ MA TRẬN RA GIAO DIỆN (Dạng bảng ô vuông)
+                    st.markdown("<div style='background: white; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
+                    header_cols = st.columns([1.2] + [1]*len(alternatives))
+                    header_cols[0].write("**Hệ số**")
+                    for k in range(len(alternatives)): header_cols[k+1].write(f"**{short_alts[k]}**")
+                    
+                    for r in range(len(alternatives)):
+                        row_cols = st.columns([1.2] + [1]*len(alternatives))
+                        row_cols[0].write(f"**{short_alts[r]}**")
+                        for c in range(len(alternatives)):
+                            val = auto_matrix[r, c]
+                            # Hiển thị giá trị đã tính toán vào các ô
+                            display_val = f"{val:.2f}" if val >= 1 else f"1/{1/val:.1f}"
+                            row_cols[c+1].markdown(f"<div style='text-align:center; background:#f8fafc; border:1px solid #e2e8f0; border-radius:4px; font-size:0.8rem;'>{display_val}</div>", unsafe_allow_html=True)
+                    st.markdown("</div>", unsafe_allow_html=True)
+                    
+                    # 3. TÍNH CR VÀ TRỌNG SỐ TỪ MA TRẬN TỰ ĐỘNG NÀY
+                    weights, cr, _, _ = calculate_ahp(auto_matrix)
+                    alt_scores_matrix[:, j] = weights
+                    
+                    st.markdown(f"<div style='text-align: center; font-size: 0.8rem; margin-top:5px; color:#16a34a; font-weight:700;'>Tỷ số CR: {cr:.4f} (Đạt chuẩn)</div>", unsafe_allow_html=True)
         
         if row_idx < 2:
-            st.markdown("<hr style='border-top: 1px dashed #cbd5e1; margin: 1rem 0 2rem 0;'>", unsafe_allow_html=True)
+            st.markdown("<hr style='margin: 1.5rem 0;'>", unsafe_allow_html=True)
 
 # ==========================================
-# BƯỚC 6: TỔNG HỢP KẾT QUẢ 
+# BƯỚC 6: TỔNG HỢP KẾT QUẢ CUỐI CÙNG
 # ==========================================
 final_scores = np.dot(alt_scores_matrix, crit_weights)
 
 df_results = pd.DataFrame({
     "Phương án": alternatives,
-    "Điểm tổng hợp AHP": final_scores,
     "Tỷ lệ phù hợp (%)": [round(s * 100, 2) for s in final_scores]
 }).sort_values(by="Tỷ lệ phù hợp (%)", ascending=False).reset_index(drop=True)
 
 df_results.index += 1
 df_results.insert(0, 'Xếp hạng', df_results.index)
 
-top_1_name = df_results.iloc[0]["Phương án"]
-top_1_score = df_results.iloc[0]["Tỷ lệ phù hợp (%)"]
-
+st.write("")
 with st.container(border=True):
-    st.markdown("#### KẾT QUẢ TỔNG HỢP")
+    st.markdown("#### KẾT QUẢ PHÂN TÍCH TỔNG HỢP")
     
-    st.markdown(f"""
-        <div style='background-color: #f1f5f9; padding: 1.5rem; border-radius: 4px; margin-bottom: 2rem; border: 1px solid #e2e8f0;'>
-            <div style='font-size: 0.9rem; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 0.5rem;'>Quyết định tối ưu nhất theo mô hình toán học</div>
-            <div style='font-size: 1.8rem; color: #0f172a; font-weight: 800;'>{top_1_name} <span style='font-size: 1.4rem; color: #475569; font-weight: 600;'>— {top_1_score}%</span></div>
-        </div>
-    """, unsafe_allow_html=True)
+    top_1 = df_results.iloc[0]
+    st.success(f"🏆 LỰA CHỌN TỐI ƯU NHẤT: **{top_1['Phương án']}** ({top_1['Tỷ lệ phù hợp (%)']}%)")
     
     col_res_chart, col_res_table = st.columns([1.5, 1], gap="large")
     
     with col_res_chart:
-        bar_colors = ['#0f172a' if i == 0 else '#94a3b8' for i in range(len(df_results))]
-        fig_final = px.bar(df_results, x="Phương án", y="Tỷ lệ phù hợp (%)", text="Tỷ lệ phù hợp (%)")
-        fig_final.update_traces(marker_color=bar_colors, textposition='outside', texttemplate='%{text:.2f}%')
-        max_y_val = df_results['Tỷ lệ phù hợp (%)'].max()
-        fig_final.update_layout(margin=dict(l=0, r=0, t=30, b=10), height=350, plot_bgcolor="rgba(0,0,0,0)", xaxis=dict(showgrid=False, title="", tickfont=dict(size=11)), yaxis=dict(showgrid=True, gridcolor='#e2e8f0', title="", range=[0, max_y_val * 1.2]), showlegend=False)
-        st.plotly_chart(fig_final, use_container_width=True, config={'displayModeBar': False})
+        # THIẾT LẬP BIỂU ĐỒ TRÒN (PIE CHART)
+        fig_final = px.pie(
+            df_results, 
+            values="Tỷ lệ phù hợp (%)", 
+            names="Phương án",
+            hole=0.4, # Tạo hiệu ứng biểu đồ vòng (Donut) cho hiện đại
+            color_discrete_sequence=px.colors.qualitative.Pastel # Bảng màu dịu mắt, chuyên nghiệp
+        )
+        
+        # Tùy chỉnh hiển thị chú giải và nhãn
+        fig_final.update_traces(
+            textposition='inside', 
+            textinfo='percent+label',
+            marker=dict(line=dict(color='#ffffff', width=2))
+        )
+        
+        fig_final.update_layout(
+            margin=dict(t=0, b=0, l=0, r=0),
+            legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5), # Đưa chú giải xuống dưới
+            height=400
+        )
+        
+        st.plotly_chart(fig_final, use_container_width=True)
         
     with col_res_table:
         st.write("")
-        st.dataframe(df_results[['Xếp hạng', 'Phương án', 'Tỷ lệ phù hợp (%)']].style.format({"Tỷ lệ phù hợp (%)": "{:.2f}%"}), use_container_width=True, hide_index=True)
+        # Hiển thị bảng dữ liệu chi tiết
+        st.dataframe(
+            df_results[['Xếp hạng', 'Phương án', 'Tỷ lệ phù hợp (%)']], 
+            use_container_width=True, 
+            hide_index=True
+        )
         
-        st.write("")
-        # Khôi phục nút Xuất báo cáo CSV
-        csv_data = df_results.to_csv(index=False).encode('utf-8-sig')
+        # Nút xuất báo cáo
+        csv = df_results.to_csv(index=False).encode('utf-8-sig')
         st.download_button(
             label="XUẤT BÁO CÁO (.CSV)",
-            data=csv_data,
-            file_name="BaoCao_AHP_KetQua.csv",
+            data=csv,
+            file_name="KetQua_PhanTich_AHP.csv",
             mime="text/csv",
+            use_container_width=True
         )
