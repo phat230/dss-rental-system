@@ -4,7 +4,8 @@ import time
 
 st.set_page_config(page_title="Đăng Nhập Hệ Thống", layout="wide")
 
-API_URL = "http://localhost:8000"
+# sửa localhost -> 127.0.0.1
+API_URL = "http://127.0.0.1:8000"
 
 # Session
 if "logged_in" not in st.session_state:
@@ -40,25 +41,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==============================
-# LOGGED IN
-# ==============================
-
-if st.session_state.logged_in:
-
-    st.success(
-        f"Bạn đang đăng nhập với tư cách: "
-        f"{st.session_state.username} ({st.session_state.role})"
-    )
-
-    if st.button("Đăng xuất"):
-        st.session_state.logged_in = False
-        st.session_state.role = None
-        st.session_state.username = None
-        st.rerun()
-
-    st.stop()
-
-# ==============================
 # LOGIN FORM
 # ==============================
 
@@ -88,8 +70,12 @@ with col2:
                     json={
                         "email": email,
                         "password": password
-                    }
+                    },
+                    timeout=5
                 )
+
+                st.write("Status:", response.status_code)
+                st.write("Response:", response.text)
 
                 data = response.json()
 
@@ -111,8 +97,8 @@ with col2:
                 else:
                     st.error(data.get("error","Login failed"))
 
-            except:
-                st.error("Không kết nối được tới backend")
+            except Exception as e:
+                st.error(f"Lỗi kết nối backend: {e}")
 
     st.write("")
 
