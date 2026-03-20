@@ -71,7 +71,7 @@ with col2:
                         "email": email,
                         "password": password
                     },
-                    timeout=5
+                    timeout=30
                 )
 
                 st.write("Status:", response.status_code)
