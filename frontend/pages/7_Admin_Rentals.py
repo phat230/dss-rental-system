@@ -75,7 +75,44 @@ else:
                 if colB.button("✏️ Sửa", key=f"edit_{rental_id}"):
                     st.session_state["edit_id"] = rental_id
                     st.session_state["edit_data"] = r
+# ======================
+# ✏️ EDIT FORM
+# ======================
+if "edit_id" in st.session_state:
 
+    st.divider()
+    st.subheader("✏️ Sửa phòng")
+
+    edit_data = st.session_state["edit_data"]
+
+    new_title = st.text_input("Title", value=edit_data.get("title"))
+    new_price = st.number_input("Price", value=edit_data.get("price", 0))
+    new_area = st.number_input("Area", value=edit_data.get("area", 0))
+    new_security = st.slider("Security", 1, 5, value=edit_data.get("security", 3))
+
+    col1, col2 = st.columns(2)
+
+    if col1.button("💾 Lưu"):
+        requests.put(
+            f"{API}/admin/update-rental/{st.session_state['edit_id']}",
+            headers=headers,
+            json={
+                "title": new_title,
+                "price": new_price,
+                "area": new_area,
+                "security": new_security
+            }
+        )
+
+        st.success("Đã cập nhật")
+        del st.session_state["edit_id"]
+        del st.session_state["edit_data"]
+        st.rerun()
+
+    if col2.button("❌ Hủy"):
+        del st.session_state["edit_id"]
+        del st.session_state["edit_data"]
+        st.rerun()
 # ======================
 # ADD NEW
 # ======================
