@@ -1,152 +1,156 @@
 import streamlit as st
-import time
+import pandas as pd
+import numpy as np
 
-# ==========================================
-# 1. CHỐT CHẶN BẢO MẬT (GATEKEEPER)
-# ==========================================
+# --- 1. CẤU HÌNH HỆ THỐNG ---
+st.set_page_config(
+    page_title="DSS - Tìm Kiếm Căn Hộ", 
+    layout="wide", 
+    initial_sidebar_state="expanded"
+)
 
-
-# --- 2. THIẾT LẬP CẤU HÌNH TRANG ---
-st.set_page_config(page_title="Truy Xuất Bất Động Sản", layout="wide", initial_sidebar_state="expanded")
-
-# --- KHỞI TẠO GIỎ HÀNG AHP (LƯU FULL DỮ LIỆU) ---
-if "selected_houses_data" not in st.session_state:
-    st.session_state["selected_houses_data"] = []
-
-# --- 3. CSS TÙY CHỈNH ---
+# --- 2. CSS ---
 st.markdown("""
     <style>
-    .main { background-color: #f8fafc; font-family: 'Inter', sans-serif; }
-    h1 { color: #0f172a !important; font-weight: 800 !important; margin-bottom: 2rem; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
     
-    .block-container { max-width: 1300px; padding-top: 2rem !important; padding-bottom: 4rem !important; }
+    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+    .block-container { padding-top: 3.5rem !important; }
     
-    [data-testid="stForm"] {
-        background-color: #ffffff; padding: 2.5rem; border-radius: 12px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0;
-        border-top: 4px solid #3b82f6; margin-bottom: 2rem;
+    /* Box đổi màu tự động */
+    .theme-card, .guide-box, .filter-container {
+        background-color: var(--secondary-background-color);
+        border: 1px solid rgba(128, 128, 128, 0.2);
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        color: var(--text-color);
     }
-
-    .property-card {
-        background-color: #ffffff; border-radius: 12px; overflow: hidden;
-        border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
-        transition: transform 0.3s ease; height: 100%;
-        display: flex; flex-direction: column; margin-bottom: 1rem;
-    }
-    .property-card:hover { transform: translateY(-5px); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
-    .prop-img { width: 100%; height: 200px; object-fit: cover; }
-    .prop-content { padding: 1.5rem; flex-grow: 1; display: flex; flex-direction: column;}
-    .prop-price { color: #3b82f6; font-size: 1.3rem; font-weight: 800; margin-bottom: 0.2rem; }
-    .prop-title { color: #0f172a; font-size: 1.1rem; font-weight: 700; margin-bottom: 0.8rem; height: 3rem; overflow: hidden;}
-    .prop-specs { font-size: 0.85rem; color: #64748b; margin-bottom: 1rem; border-bottom: 1px dashed #e2e8f0; padding-bottom: 0.8rem;}
     
-    div.stButton > button {
-        width: 100%; background-color: #f1f5f9; color: #0f172a; border: 1px solid #cbd5e1; font-weight: 700; border-radius: 6px;
-    }
-    div.stButton > button:hover {
-        background-color: #0f172a !important; color: white !important; border-color: #0f172a !important;
-    }
+    .sub-text { opacity: 0.7; font-size: 14px; }
+    .highlight { font-weight: 700; color: var(--primary-color); }
     </style>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
-# --- 4. DỮ LIỆU CƠ SỞ (22 BẤT ĐỘNG SẢN) ---
-mock_database = [
-    {"id": 1, "title": "Studio Cửa Sổ Lớn", "price": 3500000, "area": 25, "address": "Quận 10", "specs": "Gần ĐH Bách Khoa", "security": "Khá", "utility": "Cơ bản", "freedom": "Chung chủ", "img": "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=600"},
-    {"id": 2, "title": "Căn Hộ Mini Ban Công", "price": 4200000, "area": 30, "address": "Quận Tân Bình", "specs": "Full Nội Thất", "security": "Tốt", "utility": "Đầy đủ", "freedom": "Tự do", "img": "https://images.unsplash.com/photo-1502672260266-1c1c2f50ce3e?w=600"},
-    {"id": 3, "title": "Phòng Trọ Gác Xép", "price": 2800000, "area": 20, "address": "Quận 11", "specs": "Tự do giờ giấc", "security": "Trung bình", "utility": "Ít", "freedom": "Tự do", "img": "https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=600"},
-    {"id": 4, "title": "Chung Cư Mini Hiện Đại", "price": 5500000, "area": 40, "address": "Quận 7", "specs": "Camera an ninh", "security": "Rất tốt", "utility": "Hiện đại", "freedom": "Tự do", "img": "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=600"},
-    {"id": 5, "title": "Ký Túc Xá Sleepbox", "price": 1500000, "area": 15, "address": "Quận 10", "specs": "Bao điện nước", "security": "Tốt", "utility": "Nhiều", "freedom": "Thấp", "img": "https://images.unsplash.com/photo-1536376072261-38c75010e6c9?w=600"},
-    {"id": 6, "title": "Căn Hộ Dịch Vụ Cao Cấp", "price": 8500000, "area": 45, "address": "Quận 1", "specs": "Full dịch vụ", "security": "Tuyệt đối", "utility": "Full nội thất", "freedom": "Cao", "img": "https://images.unsplash.com/photo-1484154218962-a197022b5858?w=600"},
-    {"id": 7, "title": "Phòng Trọ Hàng Xanh", "price": 3200000, "area": 22, "address": "Bình Thạnh", "specs": "Không chung chủ", "security": "Khá", "utility": "Cơ bản", "freedom": "Tự do", "img": "https://images.unsplash.com/photo-1499916078039-922301b0eb9b?w=600"},
-    {"id": 8, "title": "Studio Vinhome Central Park", "price": 12000000, "area": 38, "address": "Bình Thạnh", "specs": "Đẳng cấp 5 sao", "security": "Rất cao", "utility": "Sang trọng", "freedom": "Tự do", "img": "https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?w=600"},
-    {"id": 9, "title": "Nhà Nguyên Căn Hẻm Nhỏ", "price": 7500000, "area": 55, "address": "Phú Nhuận", "specs": "1 trệt 1 lầu", "security": "Trung bình", "utility": "Không nội thất", "freedom": "Tuyệt đối", "img": "https://images.unsplash.com/photo-1513584684374-8bab748fbf90?w=600"},
-    {"id": 10, "title": "Phòng Trọ Sinh Viên Giá Rẻ", "price": 2000000, "area": 18, "address": "Quận 9", "specs": "Gần khu công nghệ cao", "security": "Thấp", "utility": "Tối giản", "freedom": "23h đóng cửa", "img": "https://images.unsplash.com/photo-1554995207-c18c203602cb?w=600"},
-    {"id": 11, "title": "Căn Hộ Duplex Trần Não", "price": 9500000, "area": 50, "address": "Quận 2", "specs": "Có gác rộng thoáng", "security": "Tốt", "utility": "Hiện đại", "freedom": "Tự do", "img": "https://images.unsplash.com/photo-1505691938895-1758d7feb511?w=600"},
-    {"id": 12, "title": "Studio Minimalist Đa Kao", "price": 6800000, "area": 28, "address": "Quận 1", "specs": "Phong cách tối giản", "security": "Khá", "utility": "Đầy đủ", "freedom": "Tự do", "img": "https://images.unsplash.com/photo-1493663284031-b7e3aefcae8e?w=600"},
-    {"id": 13, "title": "Căn Hộ Panorama View Sông", "price": 14000000, "area": 75, "address": "Quận 7", "specs": "View sông cực chill", "security": "Tuyệt đối", "utility": "Cao cấp", "freedom": "Tự do", "img": "https://images.unsplash.com/photo-1493209638045-3414a83937b1?w=600"},
-    {"id": 14, "title": "Phòng Trọ Mới Xây Q.8", "price": 3000000, "area": 24, "address": "Quận 8", "specs": "Sạch sẽ thoáng mát", "security": "Khá", "utility": "Cơ bản", "freedom": "Tự do", "img": "https://images.unsplash.com/photo-1524061614234-8449637536ee?w=600"},
-    {"id": 15, "title": "Penthouse Mini Sân Thượng", "price": 18000000, "area": 90, "address": "Quận 3", "specs": "Tiệc BBQ ngoài trời", "security": "Rất cao", "utility": "Full option", "freedom": "Tuyệt đối", "img": "https://images.unsplash.com/photo-1502672023488-70e25813eb80?w=600"},
-    {"id": 16, "title": "Phòng Trọ Box 2 Người", "price": 2500000, "area": 18, "address": "Quận 5", "specs": "Gần ĐH Y Dược", "security": "Tốt", "utility": "Máy lạnh trung tâm", "freedom": "Trung bình", "img": "https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=600"},
-    {"id": 17, "title": "Studio Thiết Kế Loft", "price": 7200000, "area": 32, "address": "Quận 4", "specs": "Gần cầu Khánh Hội", "security": "Tốt", "utility": "Đầy đủ", "freedom": "Tự do", "img": "https://images.unsplash.com/photo-1522156373667-4c7234bbd804?w=600"},
-    {"id": 18, "title": "Căn Hộ Sân Vườn Thảo Điền", "price": 16000000, "area": 100, "address": "Quận 2", "specs": "Yên tĩnh biệt lập", "security": "Rất cao", "utility": "Hồ bơi riêng", "freedom": "Tuyệt đối", "img": "https://images.unsplash.com/photo-1494438639946-1ebd1d20bf85?w=600"},
-    {"id": 19, "title": "Phòng Trọ Gò Vấp Sạch", "price": 2700000, "area": 20, "address": "Gò Vấp", "specs": "Gần công viên", "security": "Khá", "utility": "Tủ lạnh riêng", "freedom": "Tự do", "img": "https://images.unsplash.com/photo-1499955085172-a104c9463ece?w=600"},
-    {"id": 20, "title": "Căn Hộ Officetel Sun Avenue", "price": 10500000, "area": 42, "address": "TP. Thủ Đức", "specs": "Vừa ở vừa làm việc", "security": "Rất cao", "utility": "Thông minh", "freedom": "Tự do", "img": "https://images.unsplash.com/photo-1486304873000-2356438275de?w=600"},
-    {"id": 21, "title": "Phòng Trọ Kín Q.6", "price": 2300000, "area": 18, "address": "Quận 6", "specs": "Khu dân cư ổn định", "security": "Trung bình", "utility": "Tối giản", "freedom": "Trung bình", "img": "https://images.unsplash.com/photo-1501183638710-841dd1904538?w=600"},
-    {"id": 22, "title": "Studio Ánh Sáng Tân Phú", "price": 4800000, "area": 30, "address": "Quận Tân Phú", "specs": "Cửa sổ hướng Đông", "security": "Tốt", "utility": "Đầy đủ", "freedom": "Tự do", "img": "https://images.unsplash.com/photo-1512918583163-0133a656ad7e?w=600"}
-]
+# =========================================================================
+# TOP NAVBAR (ĐỒNG BỘ 100% KÍCH THƯỚC CHO TẤT CẢ CÁC TRANG)
+# =========================================================================
+nav_1, nav_2, nav_3, nav_4, nav_space, nav_auth = st.columns([1.5, 1.5, 1.5, 1.5, 3.5, 1.5])
 
-def format_vnd(price):
-    return "{:,.0f} VNĐ".format(price).replace(",", ".")
+with nav_1: st.page_link("app.py", label="Trang chủ")
+with nav_2: st.page_link("pages/3_AHP_Input.py", label="Thuật toán")
+with nav_3: st.page_link("pages/4_Search_Rentals.py", label="Tìm kiếm")
+with nav_4: st.page_link("pages/5_Results.py", label="Báo cáo")
 
-# --- 5. SIDEBAR: QUẢN LÝ ---
-st.sidebar.markdown("### 📋 DANH SÁCH CHỌN (AHP)")
-selected_list = st.session_state["selected_houses_data"]
-
-if not selected_list:
-    st.sidebar.info("Chưa có căn nào được chọn.")
+if not st.session_state.get("token"):
+    with nav_auth:
+        if st.button("Đăng nhập", use_container_width=True, key="top_login"):
+            st.switch_page("pages/1_Login.py")
 else:
-    for idx, house in enumerate(selected_list):
-        st.sidebar.write(f"{idx+1}. {house['Ten']}")
+    with nav_space:
+        name = st.session_state.get('name', 'Khách hàng')
+        st.markdown(f"<div style='margin-top: 8px; font-weight: 600; text-align: right; color: #4B5563;'>Chào, {name}</div>", unsafe_allow_html=True)
+    with nav_auth:
+        if st.button("Thoát", use_container_width=True, key="top_logout"):
+            st.session_state.clear()
+            st.rerun()
+
+st.markdown("<hr style='margin-top: 5px; margin-bottom: 30px; border-color: #E5E7EB;'>", unsafe_allow_html=True)
+# =========================================================================
+# 4. HÀM NỘI SUY (MAPPING)
+# =========================================================================
+def get_price_desc(v): return f"{1 + (v - 1) * (9/8):.1f} Triệu"
+def get_area_desc(v): return f"{int(15 + (v - 1) * (85/8))} m2"
+
+def get_security_detail(v):
+    v = int(v)
+    descs = {
+        9: "Tuyệt đối: Bảo vệ 24/7, Camera toàn khu, Thẻ từ thang máy",
+        8: "Rất cao: Khóa vân tay, Cổng tự động, Camera an ninh",
+        7: "Cao: Khu dân trí, Camera hành lang, Cửa khóa từ",
+        6: "Tốt: Khóa cổng chung vân tay, Khu vực yên tĩnh",
+        5: "Ổn định: Có cổng khóa riêng, Khu phố văn hóa",
+        4: "Khá: Cổng chung khóa chìa, Dân cư lâu năm",
+        3: "Trung bình: Khóa cổng ngoài, Cửa phòng gỗ",
+        2: "Cơ bản: Nhà trong hẻm, Cổng sắt truyền thống",
+        1: "Tối giản: Khu vực tự quản, Không có camera"
+    }
+    return descs.get(v, "Bình thường")
+
+# =========================================================================
+# 5. TẢI DỮ LIỆU & BỘ LỌC (THANH TRƯỢT MỘT ĐẦU)
+# =========================================================================
+try:
+    df = pd.read_excel("AHP11.xlsx", sheet_name="DuLieu_ThucTe_TPHCM")
+except:
+    st.error("Không tìm thấy file AHP11.xlsx")
+    st.stop()
+
+st.markdown('<div class="filter-title">Bộ lọc tìm kiếm căn hộ</div>', unsafe_allow_html=True)
+
+with st.container():
+    st.markdown('<div class="filter-container">', unsafe_allow_html=True)
+    f_col1, f_col2, f_col3 = st.columns([2, 2, 2], gap="large")
     
-    if st.sidebar.button("Làm mới danh sách"):
-        st.session_state["selected_houses_data"] = []
-        st.rerun()
+    with f_col1:
+        search_query = st.text_input("Tìm kiếm:", placeholder="Tên nhà hoặc địa chỉ...")
     
-    if len(selected_list) >= 2:
-        if st.sidebar.button("TIẾN HÀNH PHÂN TÍCH AHP ➔", type="primary"):
-            st.switch_page("pages/3_AHP_Input.py")
+    with f_col2:
+        p_range = st.slider("Ngân sách tối đa (Triệu):", 1.0, 10.0, 10.0, step=0.5)
+    
+    with f_col3:
+        # ĐÃ SỬA: Khóa đầu trái 15, chỉ cho chỉnh đầu phải (Max Area)
+        max_area = st.slider("Diện tích tối đa (Từ 15m² đến...):", 15, 100, 100)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# --- LOGIC LỌC ---
+df_f = df.copy()
+if search_query:
+    df_f = df_f[df_f['Tên nhà'].str.contains(search_query, case=False, na=False) | 
+                df_f['Địa chỉ'].str.contains(search_query, case=False, na=False)]
+
+# Map ngược giá trị về 1-9
+v_max_p = 1 + (p_range - 1) * (8 / 9)
+v_max_a = 1 + (max_area - 15) * (8 / 85)
+
+# Lọc: Mặc định tối thiểu luôn là thấp nhất (1 trong hệ 1-9 hoặc 15m2/1Tr)
+df_f = df_f[(df_f['Giá'] <= v_max_p) & (df_f['Diện tích'] <= v_max_a)]
+
+# =========================================================================
+# 6. HIỂN THỊ KẾT QUẢ
+# =========================================================================
+if "ahp_weights" not in st.session_state:
+    st.info("Hãy thực hiện AHP để xếp hạng kết quả.")
+    df_f['Giá thuê'] = df_f['Giá'].apply(get_price_desc)
+    df_f['Diện tích m2'] = df_f['Diện tích'].apply(get_area_desc)
+    df_f['An ninh'] = df_f['An ninh'].apply(get_security_detail)
+    st.dataframe(df_f[['Mã', 'Tên nhà', 'Địa chỉ', 'Giá thuê', 'Diện tích m2', 'An ninh']], use_container_width=True, hide_index=True)
+else:
+    w = st.session_state["ahp_weights"]
+    if not df_f.empty:
+        # Chuẩn hóa & Tính điểm
+        for col, key in zip(['Giá', 'Chất lượng', 'An ninh', 'Diện tích'], ['G_n', 'CL_n', 'AN_n', 'DT_n']):
+            if col == 'Giá':
+                df_f[key] = (df_f[col].max() - df_f[col]) / (df_f[col].max() - df_f[col].min() + 0.001)
+            else:
+                df_f[key] = (df_f[col] - df_f[col].min()) / (df_f[col].max() - df_f[col].min() + 0.001)
+
+        df_f['Score'] = (df_f['G_n']*w[0] + df_f['CL_n']*w[2] + df_f['AN_n']*w[3] + df_f['DT_n']*w[4])
+        df_res = df_f.sort_values('Score', ascending=False)
+
+        # Định dạng hiển thị
+        df_res['Giá thuê'] = df_res['Giá'].apply(get_price_desc)
+        df_res['Diện tích m2'] = df_res['Diện tích'].apply(get_area_desc)
+        df_res['An ninh'] = df_res['An ninh'].apply(get_security_detail)
+        df_res['Phù hợp (%)'] = (df_res['Score'] * 100).round(1)
+
+        st.markdown(f"#### Tìm thấy **{len(df_res)}** căn hộ (15m² - {max_area}m²):")
+        st.dataframe(
+            df_res[['Mã', 'Tên nhà', 'Địa chỉ', 'Giá thuê', 'Diện tích m2', 'An ninh', 'Phù hợp (%)']],
+            use_container_width=True, hide_index=True
+        )
     else:
-        st.sidebar.warning("Chọn ít nhất 2 căn.")
+        st.warning("Không có căn hộ nào nằm trong khoảng diện tích và giá này.")
 
-# --- 6. HEADER ---
-st.markdown("<h1>TRUY XUẤT BẤT ĐỘNG SẢN</h1>", unsafe_allow_html=True)
-
-# --- 7. TÌM KIẾM ---
-with st.form("search_console"):
-    search_query = st.text_input("Tìm kiếm theo khu vực, đặc điểm...", placeholder="VD: Quận 10, Ban công, Studio...")
-    col_p, col_a = st.columns(2)
-    with col_p: max_price = st.number_input("Ngân sách tối đa (VNĐ)", value=10000000, step=500000)
-    with col_a: min_area = st.number_input("Diện tích tối thiểu (m²)", value=15, step=5)
-    submitted = st.form_submit_button("TIẾN HÀNH TRUY XUẤT", use_container_width=True)
-
-# --- 8. HIỂN THỊ ---
-query = search_query.lower() if search_query else ""
-filtered = [i for i in mock_database if i["price"] <= max_price and i["area"] >= min_area and (query in i["title"].lower() or query in i["address"].lower())]
-
-if filtered:
-    st.markdown(f"### Tìm thấy {len(filtered)} kết quả phù hợp")
-    for i in range(0, len(filtered), 3):
-        cols = st.columns(3, gap="large")
-        for j in range(3):
-            if i + j < len(filtered):
-                prop = filtered[i + j]
-                with cols[j]:
-                    st.markdown(f"""
-                        <div class="property-card">
-                            <img class="prop-img" src="{prop['img']}">
-                            <div class="prop-content">
-                                <div class="prop-price">{format_vnd(prop['price'])}</div>
-                                <div class="prop-title">{prop['title']}</div>
-                                <div class="prop-specs"><b>{prop['area']} m²</b> • {prop['address']} • {prop['specs']}</div>
-                            </div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    
-                    if st.button(f"Chọn vào AHP", key=f"btn_{prop['id']}"):
-                        if not any(h['Ten'] == prop['title'] for h in st.session_state["selected_houses_data"]):
-                            if len(st.session_state["selected_houses_data"]) < 5:
-                                # ĐÓNG GÓI FULL DỮ LIỆU SANG TRANG 3
-                                st.session_state["selected_houses_data"].append({
-                                    "Ten": prop['title'],
-                                    "Giá thuê": f"{prop['price']:,} VNĐ",
-                                    "Vị trí": prop['address'],
-                                    "Diện tích": f"{prop['area']} m²",
-                                    "An ninh": prop['security'],
-                                    "Tiện ích": prop['utility'],
-                                    "Tự do": prop['freedom']
-                                })
-                                st.rerun()
-                            else: st.error("Tối đa 5 căn.")
-                        else: st.warning("Đã chọn căn này.")
-else:
-    st.warning("Không tìm thấy kết quả phù hợp với tiêu chí của bạn.")
+if st.button("XEM CHI TIẾT BÁO CÁO", type="primary"):
+    st.switch_page("pages/5_Results.py")

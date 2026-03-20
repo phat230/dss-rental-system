@@ -4,7 +4,7 @@ import time
 
 st.set_page_config(page_title="Đăng Ký", layout="wide")
 
-API_URL = "http://localhost:8000"
+API_URL = "http://127.0.0.1:8000"
 
 col1, col2, col3 = st.columns([1,1.3,1])
 
@@ -42,8 +42,12 @@ with col2:
                             "name": fullname,
                             "email": email,
                             "password": password
-                        }
+                        },
+                        timeout=5
                     )
+
+                    st.write("Status:", response.status_code)
+                    st.write("Response:", response.text)
 
                     data = response.json()
 
@@ -57,8 +61,8 @@ with col2:
                     else:
                         st.error(data.get("error","Register failed"))
 
-                except:
-                    st.error("Không kết nối được backend")
+                except Exception as e:
+                    st.error(f"Lỗi kết nối backend: {e}")
 
     st.write("")
 
