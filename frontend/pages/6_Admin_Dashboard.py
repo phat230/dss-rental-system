@@ -176,7 +176,7 @@ if st.button("Thêm phòng trọ"):
 # 📥 IMPORT EXCEL
 # ======================
 st.divider()
-st.subheader("📊 Import dữ liệu từ Excel")
+st.subheader(" Import dữ liệu từ Excel")
 
 excel_file = st.file_uploader(
     "Upload file Excel",
