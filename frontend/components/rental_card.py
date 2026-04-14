@@ -8,10 +8,7 @@ def render_rental_card(rental, best=False):
     col1, col2 = st.columns([1,3])
 
     with col1:
-        st.image(
-            "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2",
-            use_column_width=True
-        )
+        st.image(rental["image_url"], use_column_width=True)
 
     with col2:
 

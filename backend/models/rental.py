@@ -10,4 +10,5 @@ class Rental(BaseModel):
     location: str
     security: float
     amenities: float
-    embedding: List[float]
+    embedding: List[float] = []
+    image_url: str = ""
