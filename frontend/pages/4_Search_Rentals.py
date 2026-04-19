@@ -9,31 +9,34 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 2. CSS ---
+# --- 2. CSS CHUẨN TẮC KÈ HOA (DARK/LIGHT MODE) ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-    
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
     .block-container { padding-top: 3.5rem !important; }
     
-    /* Box đổi màu tự động */
-    .theme-card, .guide-box, .filter-container {
+    /* Hộp bộ lọc tự động đổi màu */
+    .filter-container {
         background-color: var(--secondary-background-color);
-        border: 1px solid rgba(128, 128, 128, 0.2);
+        padding: 25px;
         border-radius: 12px;
-        padding: 24px;
+        border: 1px solid rgba(128,128,128,0.2);
         box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        margin-bottom: 30px;
         color: var(--text-color);
     }
-    
-    .sub-text { opacity: 0.7; font-size: 14px; }
-    .highlight { font-weight: 700; color: var(--primary-color); }
+    .filter-title { font-weight: 700; color: var(--text-color); margin-bottom: 15px; font-size: 18px; }
+    .sub-text { opacity: 0.7; font-size: 14px; color: var(--text-color); }
     </style>
     """, unsafe_allow_html=True)
 
+# --- 3. KHỞI TẠO SESSION STATE ---
+if "token" not in st.session_state: st.session_state["token"] = None
+if "name" not in st.session_state: st.session_state["name"] = "Khách hàng"
+
 # =========================================================================
-# TOP NAVBAR (ĐỒNG BỘ 100% KÍCH THƯỚC CHO TẤT CẢ CÁC TRANG)
+# 4. TOP NAVBAR (ĐỒNG BỘ 100%)
 # =========================================================================
 nav_1, nav_2, nav_3, nav_4, nav_space, nav_auth = st.columns([1.5, 1.5, 1.5, 1.5, 3.5, 1.5])
 
@@ -42,48 +45,42 @@ with nav_2: st.page_link("pages/3_AHP_Input.py", label="Thuật toán")
 with nav_3: st.page_link("pages/4_Search_Rentals.py", label="Tìm kiếm")
 with nav_4: st.page_link("pages/5_Results.py", label="Báo cáo")
 
-if not st.session_state.get("token"):
+if not st.session_state["token"]:
     with nav_auth:
         if st.button("Đăng nhập", use_container_width=True, key="top_login"):
             st.switch_page("pages/1_Login.py")
 else:
     with nav_space:
-        name = st.session_state.get('name', 'Khách hàng')
-        st.markdown(f"<div style='margin-top: 8px; font-weight: 600; text-align: right; color: #4B5563;'>Chào, {name}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='sub-text' style='margin-top: 8px; font-weight: 600; text-align: right;'>Chào, {st.session_state['name']}</div>", unsafe_allow_html=True)
     with nav_auth:
         if st.button("Thoát", use_container_width=True, key="top_logout"):
             st.session_state.clear()
             st.rerun()
 
-st.markdown("<hr style='margin-top: 5px; margin-bottom: 30px; border-color: #E5E7EB;'>", unsafe_allow_html=True)
-# =========================================================================
-# 4. HÀM NỘI SUY (MAPPING)
-# =========================================================================
-def get_price_desc(v): return f"{1 + (v - 1) * (9/8):.1f} Triệu"
-def get_area_desc(v): return f"{int(15 + (v - 1) * (85/8))} m2"
+st.markdown("<hr style='margin-top: 5px; margin-bottom: 30px; border-color: rgba(128,128,128,0.2);'>", unsafe_allow_html=True)
 
+# =========================================================================
+# 5. HÀM NỘI SUY
+# =========================================================================
+def get_price_desc(v): return f"{1 + (v - 1) * (9/8):.1f} Triệu" if pd.notna(v) else "N/A"
+def get_area_desc(v): return f"{int(15 + (v - 1) * (85/8))} m2" if pd.notna(v) else "N/A"
 def get_security_detail(v):
-    v = int(v)
+    if pd.isna(v): return "N/A"
     descs = {
-        9: "Tuyệt đối: Bảo vệ 24/7, Camera toàn khu, Thẻ từ thang máy",
-        8: "Rất cao: Khóa vân tay, Cổng tự động, Camera an ninh",
-        7: "Cao: Khu dân trí, Camera hành lang, Cửa khóa từ",
-        6: "Tốt: Khóa cổng chung vân tay, Khu vực yên tĩnh",
-        5: "Ổn định: Có cổng khóa riêng, Khu phố văn hóa",
-        4: "Khá: Cổng chung khóa chìa, Dân cư lâu năm",
-        3: "Trung bình: Khóa cổng ngoài, Cửa phòng gỗ",
-        2: "Cơ bản: Nhà trong hẻm, Cổng sắt truyền thống",
-        1: "Tối giản: Khu vực tự quản, Không có camera"
+        9: "Tuyệt đối: Bảo vệ 24/7", 8: "Rất cao: Khóa vân tay",
+        7: "Cao: Camera hành lang", 6: "Tốt: Cổng vân tay",
+        5: "Ổn định: Khu an ninh", 4: "Khá: Dân cư lâu năm",
+        3: "Trung bình: Khóa cổng", 2: "Cơ bản: Cổng sắt", 1: "Tối giản"
     }
-    return descs.get(v, "Bình thường")
+    return descs.get(int(v), "Bình thường")
 
 # =========================================================================
-# 5. TẢI DỮ LIỆU & BỘ LỌC (THANH TRƯỢT MỘT ĐẦU)
+# 6. TẢI DỮ LIỆU & BỘ LỌC
 # =========================================================================
 try:
     df = pd.read_excel("AHP11.xlsx", sheet_name="DuLieu_ThucTe_TPHCM")
 except:
-    st.error("Không tìm thấy file AHP11.xlsx")
+    st.error("Lỗi: Không tìm thấy file dữ liệu AHP11.xlsx")
     st.stop()
 
 st.markdown('<div class="filter-title">Bộ lọc tìm kiếm căn hộ</div>', unsafe_allow_html=True)
@@ -91,66 +88,111 @@ st.markdown('<div class="filter-title">Bộ lọc tìm kiếm căn hộ</div>', 
 with st.container():
     st.markdown('<div class="filter-container">', unsafe_allow_html=True)
     f_col1, f_col2, f_col3 = st.columns([2, 2, 2], gap="large")
-    
     with f_col1:
         search_query = st.text_input("Tìm kiếm:", placeholder="Tên nhà hoặc địa chỉ...")
-    
     with f_col2:
-        p_range = st.slider("Ngân sách tối đa (Triệu):", 1.0, 10.0, 10.0, step=0.5)
-    
+        p_max = st.slider("Ngân sách tối đa (Triệu):", 1.0, 10.0, 10.0, step=0.5)
     with f_col3:
-        # ĐÃ SỬA: Khóa đầu trái 15, chỉ cho chỉnh đầu phải (Max Area)
-        max_area = st.slider("Diện tích tối đa (Từ 15m² đến...):", 15, 100, 100)
+        a_max = st.slider("Diện tích tối đa (m2):", 15, 100, 100)
     st.markdown('</div>', unsafe_allow_html=True)
 
-# --- LOGIC LỌC ---
 df_f = df.copy()
-if search_query:
-    df_f = df_f[df_f['Tên nhà'].str.contains(search_query, case=False, na=False) | 
-                df_f['Địa chỉ'].str.contains(search_query, case=False, na=False)]
+if search_query and 'Tên nhà' in df_f.columns and 'Địa chỉ' in df_f.columns:
+    df_f = df_f[df_f['Tên nhà'].astype(str).str.contains(search_query, case=False, na=False) | 
+                df_f['Địa chỉ'].astype(str).str.contains(search_query, case=False, na=False)]
 
-# Map ngược giá trị về 1-9
-v_max_p = 1 + (p_range - 1) * (8 / 9)
-v_max_a = 1 + (max_area - 15) * (8 / 85)
+if 'Giá' in df_f.columns:
+    v_max_p = 1 + (p_max - 1) * (8 / 9)
+    df_f = df_f[df_f['Giá'] <= v_max_p]
 
-# Lọc: Mặc định tối thiểu luôn là thấp nhất (1 trong hệ 1-9 hoặc 15m2/1Tr)
-df_f = df_f[(df_f['Giá'] <= v_max_p) & (df_f['Diện tích'] <= v_max_a)]
+if 'Diện tích' in df_f.columns:
+    v_max_a = 1 + (a_max - 15) * (8 / 85)
+    df_f = df_f[df_f['Diện tích'] <= v_max_a]
 
 # =========================================================================
-# 6. HIỂN THỊ KẾT QUẢ
+# 7. HIỂN THỊ KẾT QUẢ VÀ MA TRẬN SAATY SO SÁNH PHƯƠNG ÁN
 # =========================================================================
-if "ahp_weights" not in st.session_state:
-    st.info("Hãy thực hiện AHP để xếp hạng kết quả.")
-    df_f['Giá thuê'] = df_f['Giá'].apply(get_price_desc)
-    df_f['Diện tích m2'] = df_f['Diện tích'].apply(get_area_desc)
-    df_f['An ninh'] = df_f['An ninh'].apply(get_security_detail)
-    st.dataframe(df_f[['Mã', 'Tên nhà', 'Địa chỉ', 'Giá thuê', 'Diện tích m2', 'An ninh']], use_container_width=True, hide_index=True)
+if "ahp_weights" not in st.session_state or "ahp_criteria" not in st.session_state:
+    st.info("Hãy thực hiện Thuật toán AHP để hệ thống sắp xếp kết quả tối ưu cho bạn.")
+    if 'Giá' in df_f.columns: df_f['Giá thuê'] = df_f['Giá'].apply(get_price_desc)
+    if 'Diện tích' in df_f.columns: df_f['Diện tích m2'] = df_f['Diện tích'].apply(get_area_desc)
+    if 'An ninh' in df_f.columns: df_f['An ninh thực'] = df_f['An ninh'].apply(get_security_detail)
+    
+    display_cols = [c for c in ['Mã', 'Tên nhà', 'Địa chỉ', 'Giá thuê', 'Diện tích m2', 'An ninh thực'] if c in df_f.columns]
+    st.dataframe(df_f[display_cols], use_container_width=True, hide_index=True)
 else:
     w = st.session_state["ahp_weights"]
+    cri = st.session_state["ahp_criteria"]
+    weight_dict = dict(zip(cri, w))
+
     if not df_f.empty:
-        # Chuẩn hóa & Tính điểm
-        for col, key in zip(['Giá', 'Chất lượng', 'An ninh', 'Diện tích'], ['G_n', 'CL_n', 'AN_n', 'DT_n']):
-            if col == 'Giá':
-                df_f[key] = (df_f[col].max() - df_f[col]) / (df_f[col].max() - df_f[col].min() + 0.001)
-            else:
-                df_f[key] = (df_f[col] - df_f[col].min()) / (df_f[col].max() - df_f[col].min() + 0.001)
+        # Tính điểm tổng hợp Score
+        df_f['Score'] = 0.0
+        for col in ['Giá', 'Khoảng cách', 'Chất lượng', 'An ninh', 'Diện tích']:
+            if col in df_f.columns and col in weight_dict:
+                c_min, c_max = df_f[col].min(), df_f[col].max()
+                if c_max == c_min: c_max += 0.001
+                if col in ['Giá', 'Khoảng cách']:
+                    n_val = (c_max - df_f[col]) / (c_max - c_min)
+                else:
+                    n_val = (df_f[col] - c_min) / (c_max - c_min)
+                df_f['Score'] += n_val * weight_dict[col]
 
-        df_f['Score'] = (df_f['G_n']*w[0] + df_f['CL_n']*w[2] + df_f['AN_n']*w[3] + df_f['DT_n']*w[4])
         df_res = df_f.sort_values('Score', ascending=False)
-
-        # Định dạng hiển thị
-        df_res['Giá thuê'] = df_res['Giá'].apply(get_price_desc)
-        df_res['Diện tích m2'] = df_res['Diện tích'].apply(get_area_desc)
-        df_res['An ninh'] = df_res['An ninh'].apply(get_security_detail)
+        
+        if 'Giá' in df_res.columns: df_res['Giá thuê'] = df_res['Giá'].apply(get_price_desc)
+        if 'Diện tích' in df_res.columns: df_res['Diện tích m2'] = df_res['Diện tích'].apply(get_area_desc)
+        if 'An ninh' in df_res.columns: df_res['An ninh thực'] = df_res['An ninh'].apply(get_security_detail)
         df_res['Phù hợp (%)'] = (df_res['Score'] * 100).round(1)
 
-        st.markdown(f"#### Tìm thấy **{len(df_res)}** căn hộ (15m² - {max_area}m²):")
-        st.dataframe(
-            df_res[['Mã', 'Tên nhà', 'Địa chỉ', 'Giá thuê', 'Diện tích m2', 'An ninh', 'Phù hợp (%)']],
-            use_container_width=True, hide_index=True
-        )
-    else:
-        st.warning("Không có căn hộ nào nằm trong khoảng diện tích và giá này.")
+        # -------------------------------------------------------------------------
+        # 1. HIỂN THỊ DANH SÁCH TỔNG HỢP LÊN TRƯỚC (UX TỐT NHẤT)
+        # -------------------------------------------------------------------------
+        st.markdown(f"####  Tổng hợp: Đã tìm thấy **{len(df_res)}** căn hộ thỏa mãn bộ lọc")
+        display_cols = [c for c in ['Mã', 'Tên nhà', 'Địa chỉ', 'Giá thuê', 'Diện tích m2', 'An ninh thực', 'Phù hợp (%)'] if c in df_res.columns]
+        st.dataframe(df_res[display_cols], use_container_width=True, hide_index=True)
+        
+        st.markdown("<hr style='border-color: rgba(128,128,128,0.2); margin-top:30px; margin-bottom:30px;'>", unsafe_allow_html=True)
 
+        # -------------------------------------------------------------------------
+        # 2. MA TRẬN SAATY SO SÁNH CHÉO XUỐNG DƯỚI
+        # -------------------------------------------------------------------------
+        st.markdown("###  Ma trận Saaty so sánh Phương án theo Tiêu chí")
+        st.markdown("<p class='sub-text' style='margin-bottom:20px;'>Hệ thống nội suy Ma trận vuông so sánh cặp dựa trên 5 phương án dẫn đầu để đảm bảo tính đồng nhất tuyệt đối trong đánh giá AHP.</p>", unsafe_allow_html=True)
+        
+        sorted_criteria = sorted(weight_dict.items(), key=lambda item: item[1], reverse=True)
+        
+        top_5_overall = df_res.head(5)
+        global_names = top_5_overall['Tên nhà'].astype(str).tolist()
+        
+        
+        for i in range(0, len(sorted_criteria), 2):
+            cols = st.columns(2, gap="medium")
+            for j in range(2):
+                if i + j < len(sorted_criteria):
+                    crit_name, crit_weight = sorted_criteria[i+j]
+                    if crit_name in df_f.columns:
+                        with cols[j]:
+                            st.markdown(f"**🔹 Ma trận Tiêu chí: {crit_name}** <span style='color:var(--primary-color); font-weight:bold;'>(Trọng số: {crit_weight*100:.1f}%)</span>", unsafe_allow_html=True)
+                            
+                            vals = top_5_overall[crit_name].tolist()
+                            size = len(vals)
+                            mat = np.ones((size, size))
+                            
+                            for r in range(size):
+                                for c in range(size):
+                                    vr = vals[r] if vals[r] != 0 else 0.001
+                                    vc = vals[c] if vals[c] != 0 else 0.001
+                                    
+                                    if crit_name in ['Giá', 'Khoảng cách']:
+                                        mat[r, c] = vc / vr 
+                                    else:
+                                        mat[r, c] = vr / vc 
+                                        
+                            short_names = [f"PA{k+1}" for k in range(size)]
+                            df_mat = pd.DataFrame(mat, index=short_names, columns=short_names).round(2)
+                            st.dataframe(df_mat, use_container_width=True)
+
+st.markdown("<br>", unsafe_allow_html=True)
 if st.button("XEM CHI TIẾT BÁO CÁO", type="primary"):
     st.switch_page("pages/5_Results.py")
