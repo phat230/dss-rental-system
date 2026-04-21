@@ -61,7 +61,7 @@ nav_1, nav_2, nav_3, nav_4, nav_space, nav_auth = st.columns([1.5, 1.5, 1.5, 1.5
 
 with nav_1: st.page_link("app.py", label="Trang chủ")
 with nav_2: st.page_link("pages/3_AHP_Input.py", label="Thuật toán")
-with nav_3: st.page_link("pages/4_Search_Rentals.py", label="Tìm nhà")
+with nav_3: st.page_link("pages/4_Search_Rentals.py", label="Tìm kiếm")
 with nav_4: st.page_link("pages/5_Results.py", label="Báo cáo")
 
 if not st.session_state.get("token"):
